@@ -1,0 +1,42 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Node + pnpm
+node_modules/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-error.log
+.pnpm-store/
+.npm/
+.eslintcache
+
+# Build outputs
+dist/
+packages/*/dist/
+services/*/dist/
+apps/*/dist/
+
+# Next.js
+apps/frontend-next/.next/
+apps/frontend-next/.vercel/
+apps/frontend-next/out/
+
+# Coverage/artifacts
+coverage/
+*.coverage
+
+# Env files
+.env
+.env.*
+!.env.example
+apps/**/.env
+apps/**/.env.*
+
+# Editor
+.vscode/
+.idea/
+
+# Misc
+*.log
+*.tmp

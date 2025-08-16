@@ -1,0 +1,192 @@
+// builtin
+import { createServer } from 'http';
+
+// internal
+import { createEventBus } from '@fleetops/event-bus';
+import { createRobotRegistry } from '@fleetops/robot-registry';
+import type { Robot } from '@fleetops/types';
+import type { Mission, Stats } from '@fleetops/types';
+import { MissionOrchestrator } from '@fleetops/mission-orchestrator';
+
+// external
+import express from 'express';
+import cors from 'cors';
+import morgan from 'morgan';
+import { WebSocketServer } from 'ws';
+import 'dotenv/config';
+import { z } from 'zod';
+import { RobotZ, MissionZ, StatsZ, CancelReasonZ } from '@fleetops/types';
+
+
+// create shared bus
+type E = { 'robot.updated': Robot };
+type Bus = { 'mission.created': Mission; 'mission.updated': Mission; 'stats.updated': Stats };
+const bus = createEventBus<Bus>();
+const registry = createRobotRegistry(bus);
+const orchestrator = new MissionOrchestrator(bus, createEventBus<{ 'robot.updated': any }>(), {
+  autoAssign: true,
+  tickMs: 1000,
+  blockedPathRate: 0.02
+});
+orchestrator.start();
+
+// Basic config
+const PORT = Number(process.env.PORT || 4330);
+const app = express();
+app.use(express.json());
+app.use(cors());
+app.use(morgan('dev'));
+
+// Health
+app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
+
+// Validation helpers
+const IdParamZ = z.object({ id: z.string().uuid() }).strict();
+const CancelBodyZ = z.object({ reason: CancelReasonZ.optional() }).strict();
+
+// Stubbed in-memory stores until services are wired
+const robots: z.infer<typeof RobotZ>[] = [];
+const missions: z.infer<typeof MissionZ>[] = [];
+const stats: z.infer<typeof StatsZ> = { completed: 0, failed: 0, active: 0 };
+
+// seed one bot
+registry.upsert({
+  id: '33333333-3333-3333-3333-333333333333',
+  status: 'idle',
+  batteryPct: 100,
+  currentMissionId: null,
+  reassignable: true,
+  lastError: null,
+  updatedAt: new Date().toISOString()
+});
+
+// Robots
+app.get('/robots', (req, res) => {
+  const status = req.query.status as string | undefined;
+  const reassignable = req.query.reassignable as string | undefined;
+
+  let list = robots;
+  if (status) list = list.filter(r => r.status === status);
+  if (reassignable != null) {
+    const flag = reassignable === 'true';
+    list = list.filter(r => r.reassignable === flag);
+  }
+  // res.json({ success: true, data: list });
+  res.json({ success: true, data: registry.list() });
+});
+
+app.get('/robots/:id', (req, res) => {
+  const parse = IdParamZ.safeParse(req.params);
+  if (!parse.success) return res.status(400).json({ success: false, message: 'invalid id' });
+
+  const r = robots.find(x => x.id === parse.data.id);
+  if (!r) return res.status(404).json({ success: false, message: 'robot not found' });
+  res.json({ success: true, data: r });
+});
+
+app.post('/robots/:id/cancel', (req, res) => {
+  const p = IdParamZ.safeParse(req.params);
+  const b = CancelBodyZ.safeParse(req.body ?? {});
+  if (!p.success || !b.success) return res.status(400).json({ success: false, message: 'invalid input' });
+
+  const r = robots.find(x => x.id === p.data.id);
+  if (!r) return res.status(404).json({ success: false, message: 'robot not found' });
+
+  // Minimal behavior: flip to returning_to_base and enforce reassignment rules
+  r.status = 'returning_to_base';
+  const reason = b.data.reason ?? 'user';
+  r.reassignable = reason !== 'battery' && reason !== 'hardware';
+  r.updatedAt = new Date().toISOString();
+
+  // In a later phase, publish an event here
+  res.status(202).json({ success: true, data: { accepted: true, robotId: r.id } });
+});
+
+
+// Missions
+app.get('/missions', (req, res) => {
+  const status = req.query.status as string | undefined;
+  const page = Number(req.query.page || 1);
+  const limit = Math.min(Number(req.query.limit || 50), 200);
+
+  let list = missions;
+  if (status) list = list.filter(m => m.status === status);
+
+  const total = list.length;
+  const start = (page - 1) * limit;
+  const data = list.slice(start, start + limit);
+
+  res.json({
+    success: true,
+    data: orchestrator.listMissions(),
+    meta: { page: 1, limit: 100, total: orchestrator.listMissions().length, totalPages: Math.ceil(total / limit) },
+  });
+});
+
+app.get('/missions/:id', (req, res) => {
+  const parse = IdParamZ.safeParse(req.params);
+  if (!parse.success) return res.status(400).json({ success: false, message: 'invalid id' });
+
+  const m = missions.find(x => x.id === parse.data.id);
+  if (!m) return res.status(404).json({ success: false, message: 'mission not found' });
+  res.json({ success: true, data: m });
+});
+
+
+// Stats
+app.get('/stats', (_req, res) => {
+  res.json({ success: true, data: orchestrator.getStats() });
+});
+
+
+// SSE events
+app.get('/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  const off1 = bus.addWildcard(['mission.created', 'mission.updated', 'stats.updated'], (type, payload) => {
+    res.write(`event: ${type}\n`);
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    clearInterval(timer)
+  });
+
+  // Demo pings - replace with real bus later
+  const timer = setInterval(() => {
+    send('stats.updated', { ...stats, ts: new Date().toISOString() });
+  }, 5000);
+  
+  req.on('close', () => off1());
+  // const send = (event: string, payload: unknown) => {
+    // res.write(`event: ${event}\n`);
+    // res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  // };
+
+  // req.on('close', () => clearInterval(timer));
+});
+
+// Error handler last
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  // Minimal safe envelope
+  res.status(500).json({ success: false, message: err instanceof Error ? err.message : 'server error' });
+});
+
+// HTTP + WS
+const server = createServer(app);
+const wss = new WebSocketServer({ server, path: '/ws' });
+
+// WS mirror
+wss.on('connection', (ws) => {
+  const off = bus.addWildcard(['mission.created','mission.updated','stats.updated'], (type, payload) => {
+    ws.send(JSON.stringify({ type, payload }));
+  });
+  ws.on('close', () => off());
+});
+
+// wss.on('connection', ws => {
+  // ws.send(JSON.stringify({ type: 'hello', ts: new Date().toISOString() }));
+// });
+
+server.listen(PORT, () => {
+  console.warn(`[api] listening on http://localhost:${PORT}`);
+});

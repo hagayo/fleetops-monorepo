@@ -1,0 +1,505 @@
+openapi: 3.1.0
+info:
+  title: FleetOps Simulation API
+  version: 1.0.0
+  description: >
+    API gateway for the in-memory fleet simulation. Includes REST and SSE contracts.
+servers:
+  - url: http://localhost:4000
+    description: Local dev
+  - url: https://api.staging.fleetops.example.com
+    description: Staging
+  - url: https://api.fleetops.example.com
+    description: Production
+tags:
+  - name: Robots
+  - name: Missions
+  - name: Analytics
+  - name: Control
+  - name: Events
+  - name: Auth
+
+paths:
+  /robots:
+    get:
+      tags: [Robots]
+      summary: List robots
+      operationId: listRobots
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [idle, assigned, en_route, delivering, returning_to_base, charging, maintenance, failed]
+        - in: query
+          name: reassignable
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RobotsResponse'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      security:
+        - bearerAuth: []
+
+  /robots/{id}:
+    get:
+      tags: [Robots]
+      summary: Get robot by id
+      operationId: getRobot
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RobotResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /robots/{id}/cancel:
+    post:
+      tags: [Control]
+      summary: Cancel robot mission and force return to base
+      description: >
+        Cancels the robot mission and forces return to base.
+        During return to base the robot may be reassigned from its current location unless the cancel reason is battery or hardware.
+        If the cancel reason is battery or hardware the robot is not reassignable until resolved.
+      operationId: cancelRobot
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason:
+                  $ref: '#/components/schemas/CancelReason'
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandAccepted'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Conflict - robot not cancelable in current state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - bearerAuth: []
+
+  /missions:
+    get:
+      tags: [Missions]
+      summary: List missions
+      operationId: listMissions
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, assigned, en_route, delivering, completed, failed, canceled]
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissionsResponse'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      security:
+        - bearerAuth: []
+
+  /missions/{id}:
+    get:
+      tags: [Missions]
+      summary: Get mission by id
+      operationId: getMission
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /stats:
+    get:
+      tags: [Analytics]
+      summary: Get counters
+      operationId: getStats
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      security:
+        - bearerAuth: []
+
+  /events:
+    get:
+      tags: [Events]
+      summary: Server Sent Events stream
+      operationId: sseEvents
+      responses:
+        '200':
+          description: OK
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: |
+                  event: robot.updated
+                  data: {"id":"r1","status":"en_route","batteryPct":64,"ts":"2025-08-13T11:00:00Z"}
+      security:
+        - bearerAuth: []
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login and get tokens
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh tokens
+      operationId: refresh
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    UUID:
+      type: string
+      format: uuid
+
+    Position:
+      type: object
+      additionalProperties: false
+      properties:
+        x: { type: number }
+        y: { type: number }
+
+    RobotStatus:
+      type: string
+      enum: [idle, assigned, en_route, delivering, returning_to_base, charging, maintenance, failed]
+
+    MissionStatus:
+      type: string
+      enum: [pending, assigned, en_route, delivering, completed, failed, canceled]
+
+    CancelReason:
+      type: string
+      enum: [user, battery, hardware, blocked_path, system]
+
+    ErrorItem:
+      type: object
+      additionalProperties: false
+      properties:
+        field: { type: string }
+        message: { type: string }
+        code: { type: string }
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorItem'
+
+    Robot:
+      type: object
+      required: [id, status, batteryPct, reassignable]
+      additionalProperties: false
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        status: { $ref: '#/components/schemas/RobotStatus' }
+        batteryPct:
+          type: number
+          minimum: 0
+          maximum: 100
+        currentMissionId:
+          anyOf:
+            - $ref: '#/components/schemas/UUID'
+            - type: 'null'
+        reassignable: { type: boolean }
+        lastError:
+          anyOf:
+            - type: object
+              properties:
+                code: { type: string }
+                message: { type: string }
+            - type: 'null'
+        position:
+          $ref: '#/components/schemas/Position'
+        updatedAt:
+          type: string
+          format: date-time
+
+    MissionHistoryItem:
+      type: object
+      required: [status, at]
+      additionalProperties: false
+      properties:
+        status: { $ref: '#/components/schemas/MissionStatus' }
+        at: { type: string, format: date-time }
+        note: { type: string }
+
+    Mission:
+      type: object
+      required: [id, status, createdAt, updatedAt]
+      additionalProperties: false
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        robotId:
+          anyOf:
+            - $ref: '#/components/schemas/UUID'
+            - type: 'null'
+        status: { $ref: '#/components/schemas/MissionStatus' }
+        cancelReason:
+          anyOf:
+            - $ref: '#/components/schemas/CancelReason'
+            - type: 'null'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/MissionHistoryItem'
+
+    Stats:
+      type: object
+      required: [completed, failed, active]
+      properties:
+        completed: { type: integer, minimum: 0 }
+        failed: { type: integer, minimum: 0 }
+        active: { type: integer, minimum: 0 }
+
+    EventEnvelope:
+      type: object
+      required: [type, ts, payload]
+      properties:
+        type:
+          type: string
+          enum: [robot.updated, mission.created, mission.updated, stats.updated]
+        ts:
+          type: string
+          format: date-time
+        payload:
+          oneOf:
+            - $ref: '#/components/schemas/Robot'
+            - $ref: '#/components/schemas/Mission'
+            - $ref: '#/components/schemas/Stats'
+
+    ApiResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data: {}
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorItem'
+
+    RobotsResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Robot'
+
+    RobotResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Robot'
+
+    MissionsResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Mission'
+            meta:
+              type: object
+              properties:
+                page: { type: integer }
+                limit: { type: integer }
+                total: { type: integer }
+                totalPages: { type: integer }
+
+    MissionResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Mission'
+
+    StatsResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Stats'
+
+    CommandAccepted:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                accepted: { type: boolean }
+                robotId: { $ref: '#/components/schemas/UUID' }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      additionalProperties: false
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+
+    AuthResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [accessToken, refreshToken]
+              properties:
+                accessToken: { type: string }
+                refreshToken: { type: string }

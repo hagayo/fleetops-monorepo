@@ -1,0 +1,38 @@
+{
+  "name": "fleetops-monorepo",
+  "private": true,
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "api:dev": "pnpm -F @fleetops/api-gateway dev",
+    "web:dev": "pnpm -F @fleetops/frontend-next dev",
+    "api:build": "pnpm -F @fleetops/api-gateway build",
+    "web:build": "pnpm -F @fleetops/frontend-next build",
+    "types:gen": "openapi-typescript apps/api-gateway/docs/openapi.yaml -o packages/types/src/generated.ts",
+    "types:build": "pnpm -F @fleetops/types build",
+    "types:check": "pnpm -F @fleetops/types check",
+    "types:check:direct": "tsc -p packages/types/tsconfig.json --noEmit",
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "6.21.0",
+    "@typescript-eslint/parser": "6.21.0",
+    "eslint": "8.57.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "openapi-typescript": "7.9.1",
+    "prettier": "^3.6.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "@typescript-eslint/parser": "6.21.0",
+      "@typescript-eslint/eslint-plugin": "6.21.0"
+    }
+  }
+}
+
+
