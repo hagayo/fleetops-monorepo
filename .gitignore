@@ -40,3 +40,6 @@ apps/**/.env.*
 # Misc
 *.log
 *.tmp
+
+!apps/api-gateway/.env
+!apps/frontend-next/.env.local
