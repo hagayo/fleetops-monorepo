@@ -1,5 +1,6 @@
 // builtin
-import { createServer } from 'http';
+import { createServer } from 'node:http';
+import http from 'http';
 import { randomUUID } from 'crypto';
 
 // external
@@ -19,6 +20,14 @@ import type { Robot, Mission, Stats, CancelReason } from '@fleetops/types';
 // config
 const PORT = Number(process.env.PORT || 4330);
 const SIM_CREATE = String(process.env.SIM_CREATE || 'true') === 'true';
+const requireKey: import('express').RequestHandler = (req, res, next) => {
+  const key = process.env.API_KEY;
+  if (!key) return next(); // auth disabled in dev unless API_KEY is set
+  const provided = req.get('x-api-key');
+  if (provided && provided === key) return next();
+  return res.status(401).json({ success: false, message: 'unauthorized' });
+};
+
 const app = express();
 app.use(express.json());
 app.use(cors());
@@ -71,7 +80,7 @@ const CancelBodyZ = z.object({ reason: z.enum(['user', 'battery', 'hardware', 'b
 app.get('/healthz', (_req, res) => res.status(200).json({ ok: true }));
 
 // robots
-app.get('/robots', (req, res) => {
+app.get('/robots', requireKey, (req, res) => {
   const status = req.query.status as Robot['status'] | undefined;
   const reassignable = req.query.reassignable as string | undefined;
 
@@ -83,7 +92,7 @@ app.get('/robots', (req, res) => {
   res.json({ success: true, data: list });
 });
 
-app.get('/robots/:id', (req, res) => {
+app.get('/robots/:id', requireKey, (req, res) => {
   const parse = IdParamZ.safeParse(req.params);
   if (!parse.success) return res.status(400).json({ success: false, message: 'invalid id' });
 
@@ -92,7 +101,7 @@ app.get('/robots/:id', (req, res) => {
   res.json({ success: true, data: r });
 });
 
-app.post('/robots/:id/cancel', (req, res) => {
+app.post('/robots/:id/cancel', requireKey, (req, res) => {
   const p = IdParamZ.safeParse(req.params);
   const b = CancelBodyZ.safeParse(req.body ?? {});
   if (!p.success || !b.success) return res.status(400).json({ success: false, message: 'invalid input' });
@@ -107,7 +116,7 @@ app.post('/robots/:id/cancel', (req, res) => {
 });
 
 // missions
-app.get('/missions', (req, res) => {
+app.get('/missions', requireKey, (req, res) => {
   const status = req.query.status as Mission['status'] | undefined;
   const page = Math.max(1, Number(req.query.page || 1));
   const limit = Math.min(200, Math.max(1, Number(req.query.limit || 50)));
@@ -124,7 +133,7 @@ app.get('/missions', (req, res) => {
   });
 });
 
-app.get('/missions/:id', (req, res) => {
+app.get('/missions/:id', requireKey, (req, res) => {
   const parse = IdParamZ.safeParse(req.params);
   if (!parse.success) return res.status(400).json({ success: false, message: 'invalid id' });
 
@@ -134,7 +143,7 @@ app.get('/missions/:id', (req, res) => {
 });
 
 // stats
-app.get('/stats', (_req, res) => {
+app.get('/stats', requireKey, (_req, res) => {
   res.json({ success: true, data: orchestrator.getStats() });
 });
 
@@ -157,7 +166,8 @@ app.get('/events', (req, res) => {
 
 // error handler
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  res.status(500).json({ success: false, message: err instanceof Error ? err.message : 'server error' });
+  const message = err instanceof Error ? err.message : 'server error';
+  res.status(500).json({ success: false, message });
 });
 
 // WS broadcast (optional)
@@ -172,5 +182,5 @@ wss.on('connection', (ws) => {
 
 // boot
 server.listen(PORT, () => {
-  console.warn(`[api] listening on http://localhost:${PORT}`);
+  console.log(`[api] listening on http://127.0.0.1:${PORT}`);
 });

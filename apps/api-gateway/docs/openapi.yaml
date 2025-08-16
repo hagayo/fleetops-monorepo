@@ -32,6 +32,8 @@ paths:
     get:
       tags: [Robots]
       summary: List robots
+      security:
+        - ApiKeyAuth: []
       parameters:
         - in: query
           name: status
@@ -59,6 +61,8 @@ paths:
     get:
       tags: [Robots]
       summary: Get a robot by id
+      security:
+        - ApiKeyAuth: []
       parameters:
         - in: path
           name: id
@@ -85,6 +89,8 @@ paths:
       description: >
         - Always transitions the robot to returning_to_base.
         - If cancel reason is battery or hardware, robot becomes non-reassignable until recovered.
+      security:
+        - ApiKeyAuth: []
       parameters:
         - in: path
           name: id
@@ -118,6 +124,8 @@ paths:
     get:
       tags: [Missions]
       summary: List missions
+      security:
+        - ApiKeyAuth: []
       parameters:
         - in: query
           name: status
@@ -154,6 +162,8 @@ paths:
     get:
       tags: [Missions]
       summary: Get a mission by id
+      security:
+        - ApiKeyAuth: []
       parameters:
         - in: path
           name: id
@@ -177,6 +187,8 @@ paths:
     get:
       tags: [Stats]
       summary: Get aggregate mission stats
+      security:
+        - ApiKeyAuth: []
       responses:
         "200":
           description: OK
@@ -256,7 +268,7 @@ components:
           example: false
         message:
           type: string
-          example: server error
+          example: unauthorized
 
     AcceptedResponse:
       type: object

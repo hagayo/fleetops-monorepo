@@ -344,7 +344,7 @@ export interface components {
         ErrorResponse: {
             /** @example false */
             success: boolean;
-            /** @example server error */
+            /** @example unauthorized */
             message: string;
         };
         AcceptedResponse: {
