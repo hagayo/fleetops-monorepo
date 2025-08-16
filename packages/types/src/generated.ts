@@ -4,6 +4,43 @@
  */
 
 export interface paths {
+    "/healthz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Health check */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HealthResponse"];
+                    };
+                };
+                500: components["responses"]["ServerError"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/robots": {
         parameters: {
             query?: never;
@@ -12,7 +49,32 @@ export interface paths {
             cookie?: never;
         };
         /** List robots */
-        get: operations["listRobots"];
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Filter by robot status */
+                    status?: components["schemas"]["RobotStatus"];
+                    /** @description Filter by whether the robot can be reassigned */
+                    reassignable?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RobotListResponse"];
+                    };
+                };
+                500: components["responses"]["ServerError"];
+            };
+        };
         put?: never;
         post?: never;
         delete?: never;
@@ -28,8 +90,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get robot by id */
-        get: operations["getRobot"];
+        /** Get a robot by id */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RobotResponse"];
+                    };
+                };
+                404: components["responses"]["NotFound"];
+                500: components["responses"]["ServerError"];
+            };
+        };
         put?: never;
         post?: never;
         delete?: never;
@@ -48,11 +133,40 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Cancel robot mission and force return to base
-         * @description Cancels the robot mission and forces return to base. During return to base the robot may be reassigned from its current location unless the cancel reason is battery or hardware. If the cancel reason is battery or hardware the robot is not reassignable until resolved.
+         * Cancel the current robot mission and force return-to-base
+         * @description - Always transitions the robot to returning_to_base. - If cancel reason is battery or hardware, robot becomes non-reassignable until recovered.
          *
          */
-        post: operations["cancelRobot"];
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["CancelRequest"];
+                };
+            };
+            responses: {
+                /** @description Accepted */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AcceptedResponse"];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                500: components["responses"]["ServerError"];
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -67,7 +181,32 @@ export interface paths {
             cookie?: never;
         };
         /** List missions */
-        get: operations["listMissions"];
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Filter by mission status */
+                    status?: components["schemas"]["MissionStatus"];
+                    page?: number;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MissionListResponse"];
+                    };
+                };
+                500: components["responses"]["ServerError"];
+            };
+        };
         put?: never;
         post?: never;
         delete?: never;
@@ -83,8 +222,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get mission by id */
-        get: operations["getMission"];
+        /** Get a mission by id */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MissionResponse"];
+                    };
+                };
+                404: components["responses"]["NotFound"];
+                500: components["responses"]["ServerError"];
+            };
+        };
         put?: never;
         post?: never;
         delete?: never;
@@ -100,8 +262,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get counters */
-        get: operations["getStats"];
+        /** Get aggregate mission stats */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StatsResponse"];
+                    };
+                };
+                500: components["responses"]["ServerError"];
+            };
+        };
         put?: never;
         post?: never;
         delete?: never;
@@ -117,44 +299,34 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Server Sent Events stream */
-        get: operations["sseEvents"];
+        /**
+         * Server-sent events stream
+         * @description Emits `mission.created`, `mission.updated`, `robot.updated`, and `stats.updated` events. This endpoint uses the `text/event-stream` content type and is intended for browsers or SSE clients.
+         *
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Event stream */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+                500: components["responses"]["ServerError"];
+            };
+        };
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Login and get tokens */
-        post: operations["login"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/refresh": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Refresh tokens */
-        post: operations["refresh"];
         delete?: never;
         options?: never;
         head?: never;
@@ -165,52 +337,56 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** Format: uuid */
-        UUID: string;
-        Position: {
-            x?: number;
-            y?: number;
-        };
-        /** @enum {string} */
-        RobotStatus: "idle" | "assigned" | "en_route" | "delivering" | "returning_to_base" | "charging" | "maintenance" | "failed";
-        /** @enum {string} */
-        MissionStatus: "pending" | "assigned" | "en_route" | "delivering" | "completed" | "failed" | "canceled";
-        /** @enum {string} */
-        CancelReason: "user" | "battery" | "hardware" | "blocked_path" | "system";
-        ErrorItem: {
-            field?: string;
-            message?: string;
-            code?: string;
+        HealthResponse: {
+            /** @example true */
+            ok: boolean;
         };
         ErrorResponse: {
-            /** @enum {boolean} */
-            success: false;
-            message?: string;
-            errors?: components["schemas"]["ErrorItem"][];
+            /** @example false */
+            success: boolean;
+            /** @example server error */
+            message: string;
         };
-        Robot: {
-            id: components["schemas"]["UUID"];
-            status: components["schemas"]["RobotStatus"];
-            batteryPct: number;
-            currentMissionId?: components["schemas"]["UUID"] | null;
-            reassignable: boolean;
-            lastError?: {
-                code?: string;
-                message?: string;
-            } | null;
-            position?: components["schemas"]["Position"];
-            /** Format: date-time */
-            updatedAt?: string;
+        AcceptedResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @example true */
+                accepted?: boolean;
+                /** Format: uuid */
+                robotId?: string;
+            };
         };
+        /** @enum {string} */
+        RobotStatus: "idle" | "assigned" | "en_route" | "delivering" | "returning_to_base" | "charging" | "maintenance";
+        /** @enum {string} */
+        CancelReason: "user" | "battery" | "hardware" | "blocked_path" | "system";
+        /** @enum {string} */
+        MissionStatus: "pending" | "assigned" | "en_route" | "delivering" | "completed" | "failed" | "canceled";
         MissionHistoryItem: {
-            status: components["schemas"]["MissionStatus"];
+            status: string;
             /** Format: date-time */
             at: string;
-            note?: string;
+            note?: string | null;
+        };
+        Robot: {
+            /** Format: uuid */
+            id: string;
+            status: components["schemas"]["RobotStatus"];
+            /** Format: float */
+            batteryPct: number;
+            /** Format: uuid */
+            currentMissionId?: string | null;
+            reassignable: boolean;
+            lastError?: string | null;
+            /** Format: date-time */
+            updatedAt: string;
         };
         Mission: {
-            id: components["schemas"]["UUID"];
-            robotId?: components["schemas"]["UUID"] | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            robotId?: string | null;
             status: components["schemas"]["MissionStatus"];
             cancelReason?: components["schemas"]["CancelReason"] | null;
             /** Format: date-time */
@@ -224,68 +400,43 @@ export interface components {
             failed: number;
             active: number;
         };
-        EventEnvelope: {
-            /** @enum {string} */
-            type: "robot.updated" | "mission.created" | "mission.updated" | "stats.updated";
-            /** Format: date-time */
-            ts: string;
-            payload: components["schemas"]["Robot"] | components["schemas"]["Mission"] | components["schemas"]["Stats"];
+        PaginatedMeta: {
+            page?: number;
+            limit?: number;
+            total?: number;
+            totalPages?: number;
         };
-        ApiResponse: {
-            success?: boolean;
-            message?: string;
-            data?: unknown;
-            errors?: components["schemas"]["ErrorItem"][];
+        RobotListResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["Robot"][];
         };
-        RobotsResponse: components["schemas"]["ApiResponse"] & {
-            data?: components["schemas"]["Robot"][];
+        RobotResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["Robot"];
         };
-        RobotResponse: components["schemas"]["ApiResponse"] & {
-            data?: components["schemas"]["Robot"];
+        MissionListResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["Mission"][];
+            meta: components["schemas"]["PaginatedMeta"];
         };
-        MissionsResponse: components["schemas"]["ApiResponse"] & {
-            data?: components["schemas"]["Mission"][];
-            meta?: {
-                page?: number;
-                limit?: number;
-                total?: number;
-                totalPages?: number;
-            };
+        MissionResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["Mission"];
         };
-        MissionResponse: components["schemas"]["ApiResponse"] & {
-            data?: components["schemas"]["Mission"];
+        StatsResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["Stats"];
         };
-        StatsResponse: components["schemas"]["ApiResponse"] & {
-            data?: components["schemas"]["Stats"];
-        };
-        CommandAccepted: components["schemas"]["ApiResponse"] & {
-            data?: {
-                accepted?: boolean;
-                robotId?: components["schemas"]["UUID"];
-            };
-        };
-        LoginRequest: {
-            /** Format: email */
-            email: string;
-            password: string;
-        };
-        AuthResponse: components["schemas"]["ApiResponse"] & {
-            data?: {
-                accessToken: string;
-                refreshToken: string;
-            };
+        CancelRequest: {
+            reason?: components["schemas"]["CancelReason"];
         };
     };
     responses: {
-        /** @description Resource not found */
-        NotFound: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["ErrorResponse"];
-            };
-        };
         /** @description Unauthorized */
         Unauthorized: {
             headers: {
@@ -295,7 +446,25 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description Internal server error */
+        /** @description Not Found */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Conflict */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Server error */
         ServerError: {
             headers: {
                 [name: string]: unknown;
@@ -311,231 +480,4 @@ export interface components {
     pathItems: never;
 }
 export type $defs = Record<string, never>;
-export interface operations {
-    listRobots: {
-        parameters: {
-            query?: {
-                status?: "idle" | "assigned" | "en_route" | "delivering" | "returning_to_base" | "charging" | "maintenance" | "failed";
-                reassignable?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RobotsResponse"];
-                };
-            };
-            500: components["responses"]["ServerError"];
-        };
-    };
-    getRobot: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["schemas"]["UUID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RobotResponse"];
-                };
-            };
-            404: components["responses"]["NotFound"];
-        };
-    };
-    cancelRobot: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["schemas"]["UUID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    reason?: components["schemas"]["CancelReason"];
-                };
-            };
-        };
-        responses: {
-            /** @description Accepted */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommandAccepted"];
-                };
-            };
-            404: components["responses"]["NotFound"];
-            /** @description Conflict - robot not cancelable in current state */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    listMissions: {
-        parameters: {
-            query?: {
-                status?: "pending" | "assigned" | "en_route" | "delivering" | "completed" | "failed" | "canceled";
-                page?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MissionsResponse"];
-                };
-            };
-            500: components["responses"]["ServerError"];
-        };
-    };
-    getMission: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: components["schemas"]["UUID"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MissionResponse"];
-                };
-            };
-            404: components["responses"]["NotFound"];
-        };
-    };
-    getStats: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StatsResponse"];
-                };
-            };
-            500: components["responses"]["ServerError"];
-        };
-    };
-    sseEvents: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/event-stream": string;
-                };
-            };
-        };
-    };
-    login: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LoginRequest"];
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuthResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    refresh: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    refreshToken: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuthResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-}
+export type operations = Record<string, never>;

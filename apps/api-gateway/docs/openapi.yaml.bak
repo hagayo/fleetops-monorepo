@@ -454,9 +454,3 @@ components:
           example: true
         data:
           $ref: "#/components/schemas/Stats"
-
-    CancelRequest:
-      type: object
-      properties:
-        reason:
-          $ref: "#/components/schemas/CancelReason"

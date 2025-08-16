@@ -7,6 +7,8 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
+    "types:gen": "openapi-typescript apps/api-gateway/docs/openapi.yaml -o packages/types/src/generated.ts",
+    "types:check": "tsc -p packages/types/tsconfig.json --noEmit",
     "api:dev": "pnpm -F @fleetops/api-gateway dev",
     "web:dev": "pnpm -F @fleetops/frontend-next dev",
     "api:build": "pnpm -F @fleetops/api-gateway build",
